@@ -1,0 +1,6 @@
+{
+  "name": "KāvyaLens",
+  "description": "Evidence-oriented research assistant for Sanskrit Kāvya, Kāvyashāstra, and Chhandas analysis",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

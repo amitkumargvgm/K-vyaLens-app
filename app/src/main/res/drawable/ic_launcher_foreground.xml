@@ -1,0 +1,62 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center group strictly within the 66dp safe zone (21 to 87) -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Open Palm Leaf Manuscript / Grantha Book Base -->
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M30,68 C30,64 42,60 54,64 C66,60 78,64 78,68 L78,72 C66,68 54,72 54,72 C54,72 42,68 30,72 Z" />
+        <path
+            android:fillColor="#FFE082"
+            android:pathData="M31,64 C35,58 45,56 53,60 L53,68 C45,64 35,66 31,68 Z" />
+        <path
+            android:fillColor="#FFF8E1"
+            android:pathData="M77,64 C73,58 63,56 55,60 L55,68 C63,64 73,66 77,68 Z" />
+
+        <!-- Sacred Devanagari Book Pages & Text lines -->
+        <path
+            android:strokeColor="#B78103"
+            android:strokeWidth="1.2"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000"
+            android:pathData="M36,62 L48,60 M36,65 L48,63 M60,60 L72,62 M60,63 L72,65" />
+
+        <!-- Magnifying Lens Ring (The "Lens" of KāvyaLens) -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3.2"
+            android:fillColor="#33FFD54F"
+            android:pathData="M54,44m-15,0a15,15 0,1,1 30,0a15,15 0,1,1 -30,0" />
+        <path
+            android:strokeColor="#FFC107"
+            android:strokeWidth="1.8"
+            android:fillColor="#00000000"
+            android:pathData="M54,44m-13,0a13,13 0,1,1 26,0a13,13 0,1,1 -26,0" />
+
+        <!-- Lens Handle -->
+        <path
+            android:strokeColor="#FFFFFF"
+            android:strokeWidth="3.5"
+            android:strokeLineCap="round"
+            android:pathData="M65,55 L75,65" />
+
+        <!-- Golden Quill / Lekhani feather across lens -->
+        <path
+            android:fillColor="#FFD54F"
+            android:pathData="M44,30 C50,26 58,28 62,34 C58,38 52,38 46,36 C42,42 38,48 35,52 C37,45 40,37 44,30 Z" />
+        <path
+            android:strokeColor="#FFF9C4"
+            android:strokeWidth="1.0"
+            android:pathData="M62,34 L35,52" />
+
+        <!-- Divine Sparkle / Insight Star -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,37 L55.5,41.5 L60,43 L55.5,44.5 L54,49 L52.5,44.5 L48,43 L52.5,41.5 Z" />
+    </group>
+</vector>
