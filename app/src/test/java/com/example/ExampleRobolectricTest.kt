@@ -27,7 +27,7 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `test SanskritAnalyzer analyzes classic verse`() {
+  fun `test SanskritAnalyzer analyzes classic verse`() = kotlinx.coroutines.runBlocking {
     val analysis = com.example.util.SanskritAnalyzer.analyzePassage("वागर्थाविव सम्पृक्तौ")
     org.junit.Assert.assertEquals("vagarthaviva", analysis.id)
     org.junit.Assert.assertTrue(analysis.alankaras.isNotEmpty())

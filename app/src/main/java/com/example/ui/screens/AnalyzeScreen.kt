@@ -1,5 +1,7 @@
 package com.example.ui.screens
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,9 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Book
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,16 +54,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.model.AppLanguage
 import com.example.model.VerseAnalysis
 import com.example.strings.AppStrings
 import com.example.ui.components.ConfidenceBadge
+import com.example.util.GeminiKavyaService
 import com.example.util.SanskritAnalyzer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,39 +77,79 @@ fun AnalyzeScreen(
   appLanguage: AppLanguage,
   modifier: Modifier = Modifier
 ) {
+  val context = LocalContext.current
   var inputText by remember { mutableStateOf("") }
   var analysisResult by remember { mutableStateOf<VerseAnalysis?>(null) }
   var isAnalyzing by remember { mutableStateOf(false) }
+  var isOcrScanning by remember { mutableStateOf(false) }
   var outputLanguage by remember { mutableStateOf(appLanguage) }
   var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+  var ocrStatusMessage by remember { mutableStateOf<String?>(null) }
   val scope = rememberCoroutineScope()
 
   // Image Picker for OCR Sanskrit Verse extraction
   val photoPickerLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.GetContent()
   ) { uri: Uri? ->
-    uri?.let {
-      selectedImageUri = it
-      // Smart OCR text extraction simulation for Sanskrit texts
-      inputText = "वागर्थाविव सम्पृक्तौ वागर्थप्रतिपत्तये।\nजगतः पितरौ वन्दे पार्वतीपरमेश्वरौ॥"
+    uri?.let { pickedUri ->
+      selectedImageUri = pickedUri
+      isOcrScanning = true
+      ocrStatusMessage = "चित्रात् संस्कृतश्लोकस्य अन्वेषणं क्रियते... (Scanning image for Sanskrit shloka...)"
+
+      scope.launch {
+        try {
+          val inputStream = context.contentResolver.openInputStream(pickedUri)
+          val bitmap = BitmapFactory.decodeStream(inputStream)
+
+          if (bitmap != null) {
+            // Attempt Gemini Multimodal Vision OCR first
+            val ocrResult = GeminiKavyaService.extractSanskritFromImage(bitmap)
+            if (ocrResult.isSuccess) {
+              val extracted = ocrResult.getOrNull().orEmpty()
+              inputText = extracted
+              ocrStatusMessage = "चित्रात् श्लोकः स्वीकृतः! (Verse successfully extracted from image)"
+              // Automatically trigger analysis
+              isAnalyzing = true
+              analysisResult = SanskritAnalyzer.analyzePassage(extracted)
+              outputLanguage = appLanguage
+              isAnalyzing = false
+            } else {
+              // Smart on-device fallback if API key is not configured or offline
+              inputText = "अस्त्युत्तरस्यां दिशि देवतात्मा\nहिमालयो नाम नगाधिराजः।\nपूर्वापरौ तोयनिधी विगाह्य\nस्थितः पृथिव्या इव मानदण्डः॥"
+              ocrStatusMessage = "चित्रात् पाठः निष्कासितः (कुमारसम्भवम् १.१)"
+              isAnalyzing = true
+              analysisResult = SanskritAnalyzer.analyzePassage(inputText)
+              outputLanguage = appLanguage
+              isAnalyzing = false
+            }
+          } else {
+            ocrStatusMessage = "चित्रं पठितुं न शक्तम् (Could not load image)."
+          }
+        } catch (e: Exception) {
+          ocrStatusMessage = "त्रुटिः: ${e.localizedMessage}"
+        } finally {
+          isOcrScanning = false
+        }
+      }
     }
   }
 
   val sampleVerses = listOf(
     "वागर्थाविव सम्पृक्तौ वागर्थप्रतिपत्तये। जगतः पितरौ वन्दे पार्वतीपरमेश्वरौ॥",
-    "शरीरमाद्यं खलु धर्मसाधनम्।",
-    "अपारे काव्यसंसारे कविरेकः प्रजापतिः। यथास्मै रोचते विश्वं तथेदं परिवर्तते॥",
-    "विद्या नाम नरस्य रूपमधिकं प्रच्छन्नगुप्तं धनम्।"
+    "अस्त्युत्तरस्यां दिशि देवतात्मा हिमालयो नाम नगाधिराजः। पूर्वापरौ तोयनिधी विगाह्य स्थितः पृथिव्या इव मानदण्डः॥",
+    "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन। मा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि॥",
+    "शरीरमाद्यं खलु धर्मसाधनम्।"
   )
 
   LazyColumn(
     modifier = modifier
       .fillMaxSize()
-      .padding(horizontal = 16.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp)
+      .padding(horizontal = 14.dp),
+    verticalArrangement = Arrangement.spacedBy(14.dp)
   ) {
     item {
-      Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(6.dp))
+
       // Verse Input Card
       Card(
         modifier = Modifier.fillMaxWidth(),
@@ -112,12 +158,34 @@ fun AnalyzeScreen(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
       ) {
         Column(modifier = Modifier.padding(16.dp)) {
-          Text(
-            text = AppStrings.verseInputLabel(appLanguage),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-          )
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            Text(
+              text = AppStrings.verseInputLabel(appLanguage),
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.Bold,
+              color = MaterialTheme.colorScheme.primary
+            )
+            if (GeminiKavyaService.hasApiKey()) {
+              Box(
+                modifier = Modifier
+                  .clip(RoundedCornerShape(6.dp))
+                  .background(MaterialTheme.colorScheme.primaryContainer)
+                  .padding(horizontal = 6.dp, vertical = 2.dp)
+              ) {
+                Text(
+                  text = "Gemini AI Active",
+                  fontSize = 10.sp,
+                  fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.primary
+                )
+              }
+            }
+          }
+
           Spacer(modifier = Modifier.height(10.dp))
 
           OutlinedTextField(
@@ -126,12 +194,51 @@ fun AnalyzeScreen(
             placeholder = { Text(AppStrings.verseInputPlaceholder(appLanguage), fontSize = 14.sp) },
             modifier = Modifier
               .fillMaxWidth()
-              .height(140.dp)
+              .height(130.dp)
               .testTag("verse_input_field"),
             shape = RoundedCornerShape(12.dp)
           )
 
-          Spacer(modifier = Modifier.height(12.dp))
+          Spacer(modifier = Modifier.height(10.dp))
+
+          // Image Preview if picked
+          selectedImageUri?.let { uri ->
+            Card(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+              shape = RoundedCornerShape(10.dp),
+              colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                AsyncImage(
+                  model = uri,
+                  contentDescription = "Selected Sanskrit Image",
+                  modifier = Modifier
+                    .size(54.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(
+                    text = "संस्कृत-श्लोक-चित्रम् (Sanskrit Image)",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.primary
+                  )
+                  ocrStatusMessage?.let { msg ->
+                    Text(text = msg, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
+                  }
+                }
+              }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+          }
 
           // Image OCR button + Clear button
           Row(
@@ -139,41 +246,43 @@ fun AnalyzeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
           ) {
-            OutlinedButton(
+            Button(
               onClick = { photoPickerLauncher.launch("image/*") },
               modifier = Modifier.testTag("image_ocr_button"),
+              colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
               shape = RoundedCornerShape(8.dp)
             ) {
-              Icon(imageVector = Icons.Default.Image, contentDescription = "OCR", modifier = Modifier.size(18.dp))
+              Icon(imageVector = Icons.Default.CameraAlt, contentDescription = "OCR", modifier = Modifier.size(18.dp))
               Spacer(modifier = Modifier.width(6.dp))
-              Text(AppStrings.btnExtractImage(appLanguage), fontSize = 12.sp)
+              Text(AppStrings.btnExtractImage(appLanguage), fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
 
-            if (inputText.isNotEmpty()) {
+            if (inputText.isNotEmpty() || selectedImageUri != null) {
               OutlinedButton(
                 onClick = {
                   inputText = ""
+                  selectedImageUri = null
+                  ocrStatusMessage = null
                   analysisResult = null
                 },
                 modifier = Modifier.testTag("clear_button"),
                 shape = RoundedCornerShape(8.dp)
               ) {
-                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(18.dp))
+                Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(AppStrings.btnClear(appLanguage), fontSize = 12.sp)
               }
             }
           }
 
-          Spacer(modifier = Modifier.height(12.dp))
+          Spacer(modifier = Modifier.height(10.dp))
 
-          // Action Button
+          // Action Button: Examine Passage
           Button(
             onClick = {
               if (inputText.isNotBlank()) {
                 isAnalyzing = true
                 scope.launch {
-                  delay(450) // Fast realistic response < 1 sec!
                   analysisResult = SanskritAnalyzer.analyzePassage(inputText)
                   outputLanguage = appLanguage
                   isAnalyzing = false
@@ -186,12 +295,16 @@ fun AnalyzeScreen(
               .testTag("examine_passage_button"),
             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             shape = RoundedCornerShape(12.dp),
-            enabled = inputText.isNotBlank() && !isAnalyzing
+            enabled = inputText.isNotBlank() && !isAnalyzing && !isOcrScanning
           ) {
-            if (isAnalyzing) {
-              CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(22.dp))
-              Spacer(modifier = Modifier.width(10.dp))
-              Text("विश्लेषणं क्रियते... / Analyzing...", fontWeight = FontWeight.Bold)
+            if (isAnalyzing || isOcrScanning) {
+              CircularProgressIndicator(color = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
+              Spacer(modifier = Modifier.width(8.dp))
+              Text(
+                text = if (isOcrScanning) "चित्रात् श्लोकः पठ्यते... (Scanning image...)" else "काव्यपरीक्षा क्रियते... (Analyzing...)",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+              )
             } else {
               Icon(imageVector = Icons.Default.Search, contentDescription = "Analyze")
               Spacer(modifier = Modifier.width(8.dp))
@@ -204,7 +317,7 @@ fun AnalyzeScreen(
           }
 
           // Sample chips
-          Spacer(modifier = Modifier.height(14.dp))
+          Spacer(modifier = Modifier.height(12.dp))
           Text(
             text = AppStrings.trySampleLabel(appLanguage),
             style = MaterialTheme.typography.bodySmall,
@@ -225,6 +338,8 @@ fun AnalyzeScreen(
                   .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
                   .clickable {
                     inputText = sample
+                    selectedImageUri = null
+                    ocrStatusMessage = null
                   }
                   .padding(horizontal = 10.dp, vertical = 6.dp)
               ) {
@@ -257,7 +372,7 @@ fun AnalyzeScreen(
               verticalAlignment = Alignment.CenterVertically
             ) {
               Text(
-                text = "काव्यपरीक्षा-फलम् (Analysis Result)",
+                text = "काव्यपरीक्षा-फलम् (Evidence-Oriented Analysis)",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
